@@ -5,7 +5,7 @@ import unittest
 class TestDBConfig(unittest.TestCase):
     
     def test_get_db_config(self):
-        from src.database.db_config import get_db_connection
+        from src.bgg_playground.database.db_config import get_db_connection
 
         with get_db_connection() as db_connection:
             self.assertIsNotNone(db_connection)

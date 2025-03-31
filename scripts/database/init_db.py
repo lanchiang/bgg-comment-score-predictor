@@ -1,4 +1,5 @@
-from src.database.db_config import get_db_connection
+# from src.bgg_playground.database.db_config import get_db_connection
+from bgg_playground.database.db_config import get_db_connection
 
 
 def create_table(sql_file: str):

@@ -1,4 +1,4 @@
-from src.database.db_config import get_db_connection
+from src.bgg_playground.database.db_config import get_db_connection
 
 
 def get_ratings_with_comments(sample_size=-1):

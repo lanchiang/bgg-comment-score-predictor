@@ -3,3 +3,4 @@ python-dotenv==1.0.1
 pandas==2.2.3
 click==8.1.8
 lingua-language-detector==2.0.2
+pyyaml

@@ -1,4 +1,4 @@
-from src.database.populate_db import populate_comment_lang
+from scripts.database.populate_db import populate_comment_lang
 
 
 def detect_comment_language():

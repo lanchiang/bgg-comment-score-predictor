@@ -17,7 +17,7 @@ hyperparameters = {
 
 huggingface_estimator = HuggingFace(
     entry_point='train.py',
-    source_dir='.',
+    source_dir='',
     instance_type='local_gpu',
     instance_count=1,
     role=role,

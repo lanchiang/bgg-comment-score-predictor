@@ -1,4 +1,5 @@
 import csv
+import os
 from io import StringIO
 from lingua import Language, LanguageDetectorBuilder
 import pandas as pd
@@ -6,9 +7,9 @@ import yaml
 
 from psycopg2.extras import execute_batch
 
-from src.database.db_config import get_db_connection
-from src.database.db_queries import get_ratings_with_comments
-from src.utils import logs
+from bgg_playground.database.db_config import get_db_connection
+from bgg_playground.database.db_queries import get_ratings_with_comments
+from bgg_playground.utils import logs
 
 log = logs.get_logger()
 
