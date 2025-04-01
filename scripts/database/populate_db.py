@@ -1,10 +1,9 @@
 import csv
-import os
 from io import StringIO
-from lingua import Language, LanguageDetectorBuilder
+
 import pandas as pd
 import yaml
-
+from lingua import Language, LanguageDetectorBuilder
 from psycopg2.extras import execute_batch
 
 from bgg_playground.database.db_config import get_db_connection
