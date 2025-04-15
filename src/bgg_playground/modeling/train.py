@@ -1,107 +1,124 @@
-import keras
+import argparse
+
 import mlflow
 import numpy as np
-import pandas as pd
-from hyperopt import STATUS_OK, hp, Trials, fmin, tpe
-from mlflow.models import infer_signature
-from sklearn.model_selection import train_test_split
+import torch
 
-mlflow.set_tracking_uri(uri="http://localhost:8080")
+from datasets import load_from_disk
+from mlflow.models.signature import infer_signature
 
-data = pd.read_csv(
-    "https://raw.githubusercontent.com/mlflow/mlflow/master/tests/datasets/winequality-white.csv",
-    sep=";"
+from bgg_playground.configs.model_config import ModelConfig
+
+from sklearn.metrics import accuracy_score, f1_score
+from torch.utils.data import DataLoader
+from transformers import (
+    BertForSequenceClassification,
+    AdamW,
+    get_linear_schedule_with_warmup, AutoTokenizer,
 )
 
-train, test = train_test_split(data, test_size=0.25, random_state=42)
-train_x = train.drop(["quality"], axis=1).values
-train_y = train[["quality"]].values.ravel()
-test_x = test.drop(["quality"], axis=1).values
-test_y = test[["quality"]].values.ravel()
-train_x, valid_x, train_y, valid_y = train_test_split(
-    train_x, train_y, test_size=0.2, random_state=42
-)
 
-signature = infer_signature(train_x, train_y)
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="configs/model_config.yaml", help="Path to config file")
+    parser.add_argument("--experiment_name", type=str, default="bert-text-classification")
+    return parser.parse_args()
 
+def compute_metrics(preds, labels):
+    """Calculate accuracy and F1 score."""
+    preds = np.argmax(preds, axis=1)
+    accuracy = accuracy_score(labels, preds)
+    f1 = f1_score(labels, preds, average="weighted")
+    return {"accuracy": accuracy, "f1": f1}
 
-def train_model(params, epochs, train_x, train_y, valid_x, valid_y, test_x, test_y):
-    mean = np.mean(train_x, axis=0)
-    var = np.var(train_x, axis=0)
-    model = keras.Sequential(
-        [
-            keras.Input([train_x.shape[1]]),
-            keras.layers.Normalization(mean=mean, variance=var),
-            keras.layers.Dense(units=64, activation="relu"),
-            keras.layers.Dense(units=1),
-        ]
+def train(config: ModelConfig):
+    # Initialize MLflow
+    mlflow.set_experiment(config.experiment_name)
+    mlflow.start_run()
+    mlflow.log_params(config.__dict__)
+
+    # Device setup
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Load tokenizer and dataset
+    tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_path)
+    train_dataset = load_from_disk(config.train_data_path)
+    val_dataset = load_from_disk(config.val_data_path)
+
+    # DataLoaders
+    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=config.batch_size)
+
+    # Model
+    model = BertForSequenceClassification.from_pretrained(
+        config.model_name,
+        num_labels=config.num_labels,
+    ).to(device)
+
+    # Optimizer and scheduler
+    optimizer = AdamW(model.parameters(), lr=config.learning_rate)
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=config.warmup_steps,
+        num_training_steps=len(train_loader) * config.epochs,
     )
 
-    # Compile model
-    model.compile(
-        optimizer=keras.optimizers.SGD(
-            learning_rate=params["lr"], momentum=params["momentum"]
-        ),
-        loss="mean_squared_error",
-        metrics=[keras.metrics.RootMeanSquaredError()],
+    # Training loop
+    for epoch in range(config.epochs):
+        model.train()
+        total_loss = 0
+        for batch in train_loader:
+            inputs = {k: v.to(device) for k, v in batch.items() if k != "labels"}
+            labels = batch["labels"].to(device)
+
+            optimizer.zero_grad()
+            outputs = model(**inputs, labels=labels)
+            loss = outputs.loss
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+
+            total_loss += loss.item()
+
+        avg_train_loss = total_loss / len(train_loader)
+        mlflow.log_metric("train_loss", avg_train_loss, step=epoch)
+
+        # Validation
+        model.eval()
+        val_preds, val_labels = [], []
+        for batch in val_loader:
+            with torch.no_grad():
+                inputs = {k: v.to(device) for k, v in batch.items() if k != "labels"}
+                labels = batch["labels"].to(device)
+                outputs = model(**inputs)
+
+            logits = outputs.logits.detach().cpu().numpy()
+            val_preds.extend(logits)
+            val_labels.extend(labels.cpu().numpy())
+
+        metrics = compute_metrics(np.array(val_preds), np.array(val_labels))
+        mlflow.log_metrics(metrics, step=epoch)
+
+    # Save model and tokenizer
+    model.save_pretrained(config.output_dir)
+    tokenizer.save_pretrained(config.output_dir)
+
+    # Log model to MLflow
+    signature = infer_signature(
+        example_input="Sample input text",
+        example_output={"label": 0, "score": 0.99},
+    )
+    mlflow.transformers.log_model(
+        transformers_model={"model": model, "tokenizer": tokenizer},
+        artifact_path="bert-text-classifier",
+        signature=signature,
+        input_example="Example input text",
     )
 
-    with mlflow.start_run(nested=True):
-        model.fit(
-            x=train_x,
-            y=train_y,
-            validation_data=(valid_x, valid_y),
-            epochs=epochs,
-            batch_size=64
-        )
-        # Evaluate the model
-        eval_result = model.evaluate(valid_x, valid_y, batch_size=64)
-        eval_rmse = eval_result[1]
+    mlflow.end_run()
 
-        mlflow.log_params(params)
-        mlflow.log_metric("eval_rmse", eval_rmse)
-
-        mlflow.tensorflow.log_model(model, "model", signature=signature)
-
-        return {"loss": eval_rmse, "status": STATUS_OK, "model": model}
-
-
-def objective(params):
-    result = train_model(
-        params,
-        3,
-        train_x=train_x,
-        train_y=train_y,
-        valid_x=valid_x,
-        valid_y=valid_y,
-        test_x=test_x,
-        test_y=test_y,
-    )
-    return result
-
-
-space = {
-    "lr": hp.loguniform("lr", np.log(1e-5), np.log(1e-1)),
-    "momentum": hp.uniform("momentum", 0.0, 1.0),
-}
-
-mlflow.set_experiment("wine-quality-hyperopt")
-with mlflow.start_run():
-    trials = Trials()
-    best = fmin(
-        fn=objective,
-        space=space,
-        algo=tpe.suggest,
-        max_evals=8,
-        trials=trials
-    )
-
-    best_run = sorted(trials.results, key=lambda x: x["loss"])[0]
-
-    mlflow.log_params(best)
-    mlflow.log_metric("eval_rmse", best_run["loss"])
-    mlflow.tensorflow.log_model(best_run["model"], "model", signature=signature)
-
-    # Print out the best parameters and corresponding loss
-    print(f"Best parameters: {best}")
-    print(f"Best eval rmse: {best_run['loss']}")
+if __name__ == "__main__":
+    args = parse_args()
+    config = ModelConfig.from_yaml(args.config)  # Or load YAML directly
+    train(config)

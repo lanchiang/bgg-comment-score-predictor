@@ -1,0 +1,11 @@
+experiment_name: "bert-bgg-comment-score-predictor"
+model_name: "google-bert/bert-base-uncased"
+tokenizer_path: "google-bert/bert-base-uncased"
+train_data_path: "data/processed/train"
+val_data_path: "data/processed/val"
+output_dir: "models/checkpoints/bert-finetuned"
+num_labels: 2  # Binary classification
+batch_size: 16
+learning_rate: 2e-5
+epochs: 3
+warmup_steps: 100
