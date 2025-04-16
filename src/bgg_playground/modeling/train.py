@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import mlflow
 import numpy as np
@@ -17,6 +18,9 @@ from transformers import (
     get_linear_schedule_with_warmup, AutoTokenizer,
 )
 
+from bgg_playground.utils import logs
+
+log = logs.get_logger()
 
 def parse_args():
     """Parse command line arguments."""
@@ -35,6 +39,9 @@ def compute_metrics(preds, labels):
 def train(config: ModelConfig):
     # Initialize MLflow
     mlflow.set_experiment(config.experiment_name)
+    mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI', default='file:///mlruns'))
+    log.debug(f"mlflow tracking server: {os.getenv('MLFLOW_TRACKING_URI')}")
+
     mlflow.start_run()
     mlflow.log_params(config.__dict__)
 
