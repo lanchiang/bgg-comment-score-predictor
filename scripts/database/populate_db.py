@@ -55,6 +55,7 @@ def load_csv_to_db(path: str, csv_columns: list, table_columns: list, table_name
         df = pd.concat(dfs, ignore_index=True)
     else:
         df = pd.read_csv(path)
+        print(df.head(3))
         df = df[csv_columns]
 
     log.info(f"Debug mode set to: {debug_mode}")
