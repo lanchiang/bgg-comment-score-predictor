@@ -36,9 +36,9 @@ def compute_metrics(preds, labels):
 
 def train(config: ModelConfig, **kwargs):
     # Initialize MLflow
+    log.debug(f"MLflow tracking server: {os.getenv('MLFLOW_TRACKING_URI')}")
     mlflow.set_experiment(config.experiment_name)
     mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI', default='file:///mlruns'))
-    log.debug(f"MLflow tracking server: {os.getenv('MLFLOW_TRACKING_URI')}")
 
     with mlflow.start_run() as run:
         mlflow.log_params(config.__dict__)
