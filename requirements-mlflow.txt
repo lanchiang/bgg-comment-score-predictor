@@ -1,5 +1,5 @@
 mlflow
 hyperopt
 torch
-sklearn
+scikit-learn
 transformers
