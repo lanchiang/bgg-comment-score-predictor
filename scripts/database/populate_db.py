@@ -7,7 +7,6 @@ from pathlib import Path
 import click
 import pandas as pd
 import yaml
-from awscli.customizations.emr.constants import FALSE
 from lingua import Language, LanguageDetectorBuilder
 from psycopg2.extras import execute_batch
 
