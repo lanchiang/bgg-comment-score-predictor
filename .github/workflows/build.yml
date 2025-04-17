@@ -18,6 +18,17 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        images: postgres:latest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -40,5 +51,13 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with unittest
+#      env:
+#        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/testdb
+      env:
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: testdb
+        DB_HOST: localhost
+        DB_PORT: 5432
       run: |
         python -m unittest discover -s tests/ -p "test_*.py"
