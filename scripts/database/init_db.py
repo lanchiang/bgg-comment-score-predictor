@@ -26,4 +26,3 @@ def create_table(schema_path: str):
 
 if __name__ == '__main__':
     create_table()
-    print('Table created successfully')

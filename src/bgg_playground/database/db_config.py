@@ -39,7 +39,7 @@ def create_database(db_name):
     cursor = conn.cursor()
     
     cursor.execute(f"CREATE DATABASE {db_name};")
-    print(f"Database '{db_name}' created successfully.")
+    log.info(f"Database '{db_name}' created successfully.")
     
     conn.commit()
     cursor.close()
