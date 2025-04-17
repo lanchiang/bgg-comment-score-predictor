@@ -20,6 +20,19 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_PASSWORD: postgres  # required env variable for the postgres docker image
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -33,24 +46,26 @@ jobs:
         pip install flake8 pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f requirements-mlflow.txt ]; then pip install -r requirements-mlflow.txt; fi
-    - name: Load data into database
+    - name: Preprocess data
       run: |
-    - name: Detect comment language
-      run: |
-    - name: Create train and validation Datasets
-      run: |
-    - name: Train model
+        echo 'Load data into database'
+        python scripts/database/init_db.py -s scripts/database/schema.sql
+        python scripts/database/populate_db.py -c configs/data_config.yaml -d True
+        
+        echo 'Detect comment language'
+        python scripts/database/populate_comment_language.py
+        
+        echo 'Create train and validation Datasets'
+        python scripts/data/preprocess_data.py -c configs/data_config.yaml
       env:
-        MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }} # from GitHub secrets
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: bgg
+        DB_HOST: localhost
+        DB_PORT: 5432
+#    - name: Train model
+#      env:
+#        MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }} # from GitHub secrets
 #        MLFLOW_EXPERIMENT_NAME: "github-actions-bgg-comment-score-predictor"
-      run: |
-        python src/bgg_playground_modeling/train.py --config configs/model_config.yaml --
-#    - name: Lint with flake8
 #      run: |
-#        # stop the build if there are Python syntax errors or undefined names
-#        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-#        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-#        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-#    - name: Test with pytest
-#      run: |
-#        pytest
+#        python src/bgg_playground_modeling/train.py --config configs/model_config.yaml

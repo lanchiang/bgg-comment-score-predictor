@@ -1,8 +1,13 @@
 import csv
+import glob
+import os.path
 from io import StringIO
+from pathlib import Path
 
+import click
 import pandas as pd
 import yaml
+from awscli.customizations.emr.constants import FALSE
 from lingua import Language, LanguageDetectorBuilder
 from psycopg2.extras import execute_batch
 
@@ -27,7 +32,7 @@ languages = [
 detector = LanguageDetectorBuilder.from_languages(*languages).build()
 
 
-def load_csv_to_db(csv_path: str, csv_columns: list, table_columns: list, table_name: str):
+def load_csv_to_db(path: str, csv_columns: list, table_columns: list, table_name: str, debug_mode: bool):
     """
     Loads the data from a csv file to a table in the database.
     """
@@ -38,8 +43,28 @@ def load_csv_to_db(csv_path: str, csv_columns: list, table_columns: list, table_
     conn.commit()
     log.info(f'Table {table_name} cleared successfully.')
 
-    df = pd.read_csv(csv_path)
-    df = df[csv_columns]
+    if Path(path).is_dir():
+        csv_files = glob.glob(os.path.join(path, '*.csv'))
+
+        dfs = []
+
+        for file in csv_files:
+            df = pd.read_csv(file)
+            df = df[csv_columns]
+            dfs.append(df)
+
+        df = pd.concat(dfs, ignore_index=True)
+    else:
+        df = pd.read_csv(path)
+        df = df[csv_columns]
+
+    log.info(f"Debug mode set to: {debug_mode}")
+    if debug_mode:
+        seed = 42
+        subset_size = 3000
+        df = df.sample(n=subset_size, random_state=seed)
+
+    log.info(f"Number of loaded comments: {len(df)}")
 
     output = StringIO()
     df.to_csv(output, sep='\t', quoting=csv.QUOTE_ALL, header=False, index=False)
@@ -55,10 +80,25 @@ def load_csv_to_db(csv_path: str, csv_columns: list, table_columns: list, table_
     cursor.close()
     conn.close()
 
-    log.info(f'{csv_path} loaded to {table_name} successfully')
+    log.info(f'{path} loaded to {table_name} successfully')
 
 
-def populate_db_with_config(config_file: str):
+@click.command()
+@click.option(
+    '--config_file',
+    '-c',
+    type=str,
+    default='configs/data_config.yml',
+    help='Database config file path'
+)
+@click.option(
+    '--debug_mode',
+    '-d',
+    type=bool,
+    default=False,
+    help='Load a subset of data into the database. For debug purpose only.'
+)
+def populate_db_with_config(config_file: str, debug_mode: bool):
     """
     Populates the database with the data from the csv files specified in the config file.
     """
@@ -71,7 +111,7 @@ def populate_db_with_config(config_file: str):
         table_columns = csv_config['table_columns']
         table_name = csv_config['table_name']
 
-        load_csv_to_db(file_path, csv_columns, table_columns, table_name)
+        load_csv_to_db(file_path, csv_columns, table_columns, table_name, debug_mode)
 
 
 def parallel_language_detection(ratings_with_comments):
@@ -104,4 +144,4 @@ def populate_comment_lang():
 
 
 if __name__ == '__main__':
-    populate_db_with_config('config.yaml')
+    populate_db_with_config()
