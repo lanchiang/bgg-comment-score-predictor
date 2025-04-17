@@ -22,7 +22,7 @@ jobs:
       postgres:
         image: postgres:latest
         env:
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: postgres  # required env variable for the postgres docker image
         ports:
           - 5432:5432
         options: >-
@@ -53,8 +53,6 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with unittest
-#      env:
-#        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/testdb
       env:
         DB_USER: postgres
         DB_PASSWORD: postgres

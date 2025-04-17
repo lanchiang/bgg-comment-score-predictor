@@ -1,6 +1,6 @@
 experiment_name: "bert-bgg-comment-score-predictor"
-model_name: "google-bert/bert-base-uncased"
-tokenizer_path: "google-bert/bert-base-uncased"
+model_name: "distilbert/distilbert-base-uncased"
+tokenizer_path: "distilbert/distilbert-base-uncased"
 train_data_path: "data/processed/train"
 val_data_path: "data/processed/val"
 output_dir: "models/checkpoints/bert-finetuned"

@@ -10,5 +10,6 @@ class TestDBConfig(unittest.TestCase):
             self.assertIsNotNone(db_connection)
             self.assertEqual(db_connection.info.dbname, 'testdb')
             self.assertEqual(db_connection.info.user, 'postgres')
+            self.assertEqual(db_connection.info.password, 'postgres')
             self.assertEqual(db_connection.info.host, 'localhost')
             self.assertEqual(db_connection.info.port, 5432)

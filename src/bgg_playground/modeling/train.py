@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument("--experiment_name", type=str, default="bert-text-classification")
     return parser.parse_args()
 
+
 def compute_metrics(preds, labels):
     """Calculate accuracy and F1 score."""
     preds = np.argmax(preds, axis=1)
@@ -36,94 +37,95 @@ def compute_metrics(preds, labels):
     f1 = f1_score(labels, preds, average="weighted")
     return {"accuracy": accuracy, "f1": f1}
 
+
 def train(config: ModelConfig):
     # Initialize MLflow
     mlflow.set_experiment(config.experiment_name)
     mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI', default='file:///mlruns'))
-    log.debug(f"mlflow tracking server: {os.getenv('MLFLOW_TRACKING_URI')}")
+    log.debug(f"MLflow tracking server: {os.getenv('MLFLOW_TRACKING_URI')}")
 
-    mlflow.start_run()
-    mlflow.log_params(config.__dict__)
+    with mlflow.start_run() as run:
+        mlflow.log_params(config.__dict__)
 
-    # Device setup
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Device setup
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        log.debug(f"Using device: {device}")
 
-    # Load tokenizer and dataset
-    tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_path)
-    train_dataset = load_from_disk(config.train_data_path)
-    val_dataset = load_from_disk(config.val_data_path)
+        # Load tokenizer and dataset
+        tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_path)
+        train_dataset = load_from_disk(config.train_data_path)
+        val_dataset = load_from_disk(config.val_data_path)
 
-    # DataLoaders
-    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=config.batch_size)
+        # DataLoaders
+        train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=config.batch_size)
 
-    # Model
-    model = BertForSequenceClassification.from_pretrained(
-        config.model_name,
-        num_labels=config.num_labels,
-    ).to(device)
+        # Model
+        model = BertForSequenceClassification.from_pretrained(
+            config.model_name,
+            num_labels=config.num_labels,
+        ).to(device)
 
-    # Optimizer and scheduler
-    optimizer = AdamW(model.parameters(), lr=config.learning_rate)
-    scheduler = get_linear_schedule_with_warmup(
-        optimizer,
-        num_warmup_steps=config.warmup_steps,
-        num_training_steps=len(train_loader) * config.epochs,
-    )
+        # Optimizer and scheduler
+        optimizer = AdamW(model.parameters(), lr=config.learning_rate)
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=config.warmup_steps,
+            num_training_steps=len(train_loader) * config.epochs,
+        )
 
-    # Training loop
-    for epoch in range(config.epochs):
-        model.train()
-        total_loss = 0
-        for batch in train_loader:
-            inputs = {k: v.to(device) for k, v in batch.items() if k != "labels"}
-            labels = batch["labels"].to(device)
-
-            optimizer.zero_grad()
-            outputs = model(**inputs, labels=labels)
-            loss = outputs.loss
-            loss.backward()
-            optimizer.step()
-            scheduler.step()
-
-            total_loss += loss.item()
-
-        avg_train_loss = total_loss / len(train_loader)
-        mlflow.log_metric("train_loss", avg_train_loss, step=epoch)
-
-        # Validation
-        model.eval()
-        val_preds, val_labels = [], []
-        for batch in val_loader:
-            with torch.no_grad():
+        # Training loop
+        for epoch in range(config.epochs):
+            model.train()
+            total_loss = 0
+            for batch in train_loader:
                 inputs = {k: v.to(device) for k, v in batch.items() if k != "labels"}
                 labels = batch["labels"].to(device)
-                outputs = model(**inputs)
 
-            logits = outputs.logits.detach().cpu().numpy()
-            val_preds.extend(logits)
-            val_labels.extend(labels.cpu().numpy())
+                optimizer.zero_grad()
+                outputs = model(**inputs, labels=labels)
+                loss = outputs.loss
+                loss.backward()
+                optimizer.step()
+                scheduler.step()
 
-        metrics = compute_metrics(np.array(val_preds), np.array(val_labels))
-        mlflow.log_metrics(metrics, step=epoch)
+                total_loss += loss.item()
 
-    # Save model and tokenizer
-    model.save_pretrained(config.output_dir)
-    tokenizer.save_pretrained(config.output_dir)
+            avg_train_loss = total_loss / len(train_loader)
+            mlflow.log_metric("train_loss", avg_train_loss, step=epoch)
 
-    # Log model to MLflow
-    signature = infer_signature(
-        example_input="Sample input text",
-        example_output={"label": 0, "score": 0.99},
-    )
-    mlflow.transformers.log_model(
-        transformers_model={"model": model, "tokenizer": tokenizer},
-        artifact_path="bert-text-classifier",
-        signature=signature,
-        input_example="Example input text",
-    )
+            # Validation
+            model.eval()
+            val_preds, val_labels = [], []
+            for batch in val_loader:
+                with torch.no_grad():
+                    inputs = {k: v.to(device) for k, v in batch.items() if k != "labels"}
+                    labels = batch["labels"].to(device)
+                    outputs = model(**inputs)
 
-    mlflow.end_run()
+                logits = outputs.logits.detach().cpu().numpy()
+                val_preds.extend(logits)
+                val_labels.extend(labels.cpu().numpy())
+
+            metrics = compute_metrics(np.array(val_preds), np.array(val_labels))
+            mlflow.log_metrics(metrics, step=epoch)
+
+        # Save model and tokenizer
+        model.save_pretrained(config.output_dir)
+        tokenizer.save_pretrained(config.output_dir)
+
+        # Log model to MLflow
+        signature = infer_signature(
+            example_input="Sample input text",
+            example_output={"label": 0, "score": 0.99},
+        )
+        mlflow.transformers.log_model(
+            transformers_model={"model": model, "tokenizer": tokenizer},
+            artifact_path="bert-text-classifier",
+            signature=signature,
+            input_example="Example input text",
+        )
+
 
 if __name__ == "__main__":
     args = parse_args()
