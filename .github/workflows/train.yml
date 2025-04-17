@@ -73,4 +73,4 @@ jobs:
         MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }} # from GitHub secrets
         MLFLOW_EXPERIMENT_NAME: "github-actions-bgg-comment-score-predictor"
       run: |
-        python src/bgg_playground_modeling/train.py --config configs/model_config.yaml
+        python src/bgg_playground/modeling/train.py --config configs/model_config.yaml
