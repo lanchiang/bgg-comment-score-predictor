@@ -1,4 +1,5 @@
 mlflow
-keras
-tensorflow
 hyperopt
+torch
+sklearn
+transformers

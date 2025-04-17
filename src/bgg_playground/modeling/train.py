@@ -7,10 +7,8 @@ import torch
 from datasets import load_from_disk
 from mlflow.models.signature import infer_signature
 from sklearn.metrics import accuracy_score, f1_score
-from torch.utils.data import DataLoader
 from transformers import (
-    AdamW,
-    get_linear_schedule_with_warmup, AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer,
+    AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer,
     DataCollatorWithPadding, pipeline,
 )
 
