@@ -56,7 +56,7 @@ def train(config: ModelConfig, **kwargs):
         tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_path)
 
         def tokenize(examples):
-            return tokenizer(examples['comment'], padding="max_length", truncation=True, max_length=512)
+            return tokenizer(examples['comment'], padding=True, truncation=True, max_length=512)
 
         train_dataset = load_from_disk(config.train_data_path).map(tokenize, batched=True).rename_column('rating', 'labels')
         eval_dataset = load_from_disk(config.val_data_path).map(tokenize, batched=True).rename_column('rating', 'labels')
