@@ -3,3 +3,4 @@ hyperopt
 torch
 scikit-learn
 transformers
+accelerate
