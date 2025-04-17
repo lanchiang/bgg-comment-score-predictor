@@ -26,6 +26,7 @@ def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/model_config.yaml", help="Path to config file")
+    parser.add_argument("--debug_train", type=bool, default=False, help='Whether the workflow runs a debug training job with a subset of dataset')
     parser.add_argument("--experiment_name", type=str, default="bert-text-classification")
     return parser.parse_args()
 
@@ -38,7 +39,7 @@ def compute_metrics(preds, labels):
     return {"accuracy": accuracy, "f1": f1}
 
 
-def train(config: ModelConfig):
+def train(config: ModelConfig, **kwargs):
     # Initialize MLflow
     mlflow.set_experiment(config.experiment_name)
     mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI', default='file:///mlruns'))
@@ -55,6 +56,13 @@ def train(config: ModelConfig):
         tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_path)
         train_dataset = load_from_disk(config.train_data_path)
         val_dataset = load_from_disk(config.val_data_path)
+
+        debug_train = kwargs.get('debug_train', False)
+        if debug_train:
+            seed = 42
+            subset_size = 100
+            train_dataset = train_dataset.shuffle(seed=seed).select(indices=range(subset_size))
+            val_dataset = val_dataset.shuffle(seed=seed).select(indices=range(subset_size))
 
         # DataLoaders
         train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
@@ -130,4 +138,4 @@ def train(config: ModelConfig):
 if __name__ == "__main__":
     args = parse_args()
     config = ModelConfig.from_yaml(args.config)  # Or load YAML directly
-    train(config)
+    train(config, debug_train=args.debug_train)

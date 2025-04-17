@@ -38,7 +38,7 @@ jobs:
         MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }} # from GitHub secrets
 #        MLFLOW_EXPERIMENT_NAME: "github-actions-bgg-comment-score-predictor"
       run: |
-        python src/bgg_playground_modeling/train.py --config configs/model_config.yaml
+        python src/bgg_playground_modeling/train.py --config configs/model_config.yaml --
 #    - name: Lint with flake8
 #      run: |
 #        # stop the build if there are Python syntax errors or undefined names

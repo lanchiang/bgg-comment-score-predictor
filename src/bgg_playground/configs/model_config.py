@@ -18,9 +18,6 @@ class ModelConfig:
     epochs: int
     warmup_steps: int
 
-    test_train_run: bool
-    seed: int
-
     @classmethod
     def from_yaml(cls, yaml_path: str) -> "ModelConfig":
         """Load config from a YAML file."""
