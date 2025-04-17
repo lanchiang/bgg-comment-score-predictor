@@ -17,6 +17,7 @@ from bgg_playground.utils import logs
 
 log = logs.get_logger()
 
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser()
@@ -36,7 +37,6 @@ def compute_metrics(preds, labels):
 
 def train(config: ModelConfig, **kwargs):
     # Initialize MLflow
-    log.debug(f"MLflow tracking server: {os.getenv('MLFLOW_TRACKING_URI')}")
     mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI', default='file:///mlruns'))
     mlflow.set_experiment(config.experiment_name)
 
@@ -54,8 +54,12 @@ def train(config: ModelConfig, **kwargs):
 
         # Load tokenizer and dataset
         tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_path)
-        train_dataset = load_from_disk(config.train_data_path)
-        eval_dataset = load_from_disk(config.val_data_path)
+
+        def tokenize(examples):
+            return tokenizer(examples['comment'], padding="max_length", truncation=True, max_length=512)
+
+        train_dataset = load_from_disk(config.train_data_path).map(tokenize, batched=True).rename_column('rating', 'labels')
+        eval_dataset = load_from_disk(config.val_data_path).map(tokenize, batched=True).rename_column('rating', 'labels')
 
         # Model
         model = AutoModelForSequenceClassification.from_pretrained(
@@ -70,7 +74,8 @@ def train(config: ModelConfig, **kwargs):
             per_device_eval_batch_size=config.per_device_eval_batch_size,
             num_train_epochs=config.epochs,
             weight_decay=config.weight_decay,
-            warmup_steps=config.warmup_steps
+            warmup_steps=config.warmup_steps,
+            remove_unused_columns=False
         )
 
         trainer = Trainer(
@@ -78,7 +83,6 @@ def train(config: ModelConfig, **kwargs):
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
             data_collator=DataCollatorWithPadding(tokenizer=tokenizer)
         )
 
