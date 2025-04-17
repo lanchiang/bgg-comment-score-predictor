@@ -6,8 +6,8 @@ name: Train model
 on:
   workflow_dispatch:
     inputs:
-      debug_train:
-        description: "Whether the workflow runs a debug training job with a subset of dataset"
+      debug_training:
+        description: "Run a debug training job with a subset of dataset"
         required: true
         default: false
         type: boolean
@@ -50,7 +50,7 @@ jobs:
       run: |
         echo 'Load data into database'
         python scripts/database/init_db.py -s scripts/database/schema.sql
-        python scripts/database/populate_db.py -c configs/data_config.yaml -d True
+        python scripts/database/populate_db.py -c configs/data_config.yaml -d $DEBUG_TRAINING
         
         echo 'Detect comment language'
         python scripts/database/populate_comment_language.py
@@ -63,6 +63,7 @@ jobs:
         DB_NAME: bgg
         DB_HOST: localhost
         DB_PORT: 5432
+        DEBUG_TRAINING: ${{ inputs.debug_training }}
 #    - name: Train model
 #      env:
 #        MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }} # from GitHub secrets
