@@ -68,9 +68,9 @@ jobs:
         DB_HOST: localhost
         DB_PORT: 5432
         DEBUG_TRAINING: ${{ inputs.debug_training }}
-#    - name: Train model
-#      env:
-#        MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }} # from GitHub secrets
-#        MLFLOW_EXPERIMENT_NAME: "github-actions-bgg-comment-score-predictor"
-#      run: |
-#        python src/bgg_playground_modeling/train.py --config configs/model_config.yaml
+    - name: Train model
+      env:
+        MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }} # from GitHub secrets
+        MLFLOW_EXPERIMENT_NAME: "github-actions-bgg-comment-score-predictor"
+      run: |
+        python src/bgg_playground_modeling/train.py --config configs/model_config.yaml

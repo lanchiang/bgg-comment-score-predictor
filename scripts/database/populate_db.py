@@ -43,7 +43,7 @@ def load_csv_to_db(path: str, csv_columns: list, table_columns: list, table_name
     log.info(f"Debug mode set to: {debug_mode}")
     if debug_mode:
         seed = 42
-        subset_size = 3000
+        subset_size = 2000
         df = df.sample(n=subset_size, random_state=seed)
 
     log.info(f"Number of loaded comments: {len(df)}")

@@ -7,6 +7,7 @@ def get_logger() -> logging.Logger:
     """
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
+    logger.handlers = []
     stream_handler = logging.StreamHandler()
     log_formatter = logging.Formatter(
         "%(asctime)s [%(processName)s: %(process)d] [%(threadName)s: %(thread)d] [%(levelname)s] %(name)s: %(message)s"

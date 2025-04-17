@@ -27,6 +27,9 @@ def preprocess(df: pd.DataFrame, min_comment_len = 30) -> pd.DataFrame:
     # keep only data whose comments are longer than the minimal length
     df = df[df['comment'].str.len() >= min_comment_len]
 
+    # round up/down score
+    df['rating'] = df['rating'].apply(lambda rating: round(rating))
+
     return df
 
 

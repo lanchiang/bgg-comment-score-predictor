@@ -3,6 +3,9 @@ from psycopg2.extras import execute_batch
 
 from bgg_playground.database.db_config import get_db_connection
 from bgg_playground.database.db_queries import get_ratings_with_comments
+from bgg_playground.utils import logs
+
+log = logs.get_logger()
 
 languages = [
         Language.ENGLISH,
@@ -50,7 +53,7 @@ def populate_comment_lang():
 
 def detect_comment_language():
     populate_comment_lang()
-    print('Comment language detected successfully')
+    log.info('Comment language detected successfully')
 
 
 if __name__ == '__main__':

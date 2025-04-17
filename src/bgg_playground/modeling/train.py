@@ -4,20 +4,17 @@ import os
 import mlflow
 import numpy as np
 import torch
-
 from datasets import load_from_disk
 from mlflow.models.signature import infer_signature
-
-from bgg_playground.configs.model_config import ModelConfig
-
 from sklearn.metrics import accuracy_score, f1_score
 from torch.utils.data import DataLoader
 from transformers import (
-    BertForSequenceClassification,
     AdamW,
-    get_linear_schedule_with_warmup, AutoTokenizer,
+    get_linear_schedule_with_warmup, AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer,
+    DataCollatorWithPadding, pipeline,
 )
 
+from bgg_playground.configs.model_config import ModelConfig
 from bgg_playground.utils import logs
 
 log = logs.get_logger()
@@ -49,93 +46,68 @@ def train(config: ModelConfig, **kwargs):
         mlflow.log_params(config.__dict__)
 
         # Device setup
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if torch.mps.is_available():
+            device = torch.device("mps")
+        elif torch.cuda.is_available():
+            device = torch.device("cuda")
+        else:
+            device = torch.device("cpu")
         log.debug(f"Using device: {device}")
 
         # Load tokenizer and dataset
         tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_path)
         train_dataset = load_from_disk(config.train_data_path)
-        val_dataset = load_from_disk(config.val_data_path)
-
-        debug_train = kwargs.get('debug_train', False)
-        if debug_train:
-            seed = 42
-            subset_size = 100
-            train_dataset = train_dataset.shuffle(seed=seed).select(indices=range(subset_size))
-            val_dataset = val_dataset.shuffle(seed=seed).select(indices=range(subset_size))
-
-        # DataLoaders
-        train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=config.batch_size)
+        eval_dataset = load_from_disk(config.val_data_path)
 
         # Model
-        model = BertForSequenceClassification.from_pretrained(
+        model = AutoModelForSequenceClassification.from_pretrained(
             config.model_name,
             num_labels=config.num_labels,
         ).to(device)
 
-        # Optimizer and scheduler
-        optimizer = AdamW(model.parameters(), lr=config.learning_rate)
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=config.warmup_steps,
-            num_training_steps=len(train_loader) * config.epochs,
+        training_args = TrainingArguments(
+            output_dir="./results",
+            learning_rate=config.learning_rate,
+            per_device_train_batch_size=config.per_device_train_batch_size,
+            per_device_eval_batch_size=config.per_device_eval_batch_size,
+            num_train_epochs=config.epochs,
+            weight_decay=config.weight_decay,
+            warmup_steps=config.warmup_steps
         )
 
-        # Training loop
-        for epoch in range(config.epochs):
-            model.train()
-            total_loss = 0
-            for batch in train_loader:
-                inputs = {k: v.to(device) for k, v in batch.items() if k != "labels"}
-                labels = batch["labels"].to(device)
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=tokenizer,
+            data_collator=DataCollatorWithPadding(tokenizer=tokenizer)
+        )
 
-                optimizer.zero_grad()
-                outputs = model(**inputs, labels=labels)
-                loss = outputs.loss
-                loss.backward()
-                optimizer.step()
-                scheduler.step()
-
-                total_loss += loss.item()
-
-            avg_train_loss = total_loss / len(train_loader)
-            mlflow.log_metric("train_loss", avg_train_loss, step=epoch)
-
-            # Validation
-            model.eval()
-            val_preds, val_labels = [], []
-            for batch in val_loader:
-                with torch.no_grad():
-                    inputs = {k: v.to(device) for k, v in batch.items() if k != "labels"}
-                    labels = batch["labels"].to(device)
-                    outputs = model(**inputs)
-
-                logits = outputs.logits.detach().cpu().numpy()
-                val_preds.extend(logits)
-                val_labels.extend(labels.cpu().numpy())
-
-            metrics = compute_metrics(np.array(val_preds), np.array(val_labels))
-            mlflow.log_metrics(metrics, step=epoch)
+        trainer.train()
 
         # Save model and tokenizer
         model.save_pretrained(config.output_dir)
         tokenizer.save_pretrained(config.output_dir)
 
+        # Create a pipeline for generating signature output
+        classifier = pipeline("text-classification", model=model, tokenizer=tokenizer)
+        test_input = "This is the best game I have ever played!"
+        prediction = classifier(test_input)
         # Log model to MLflow
         signature = infer_signature(
-            example_input="Sample input text",
-            example_output={"label": 0, "score": 0.99},
+            model_input=test_input,
+            model_output=prediction
         )
         mlflow.transformers.log_model(
             transformers_model={"model": model, "tokenizer": tokenizer},
             artifact_path="bert-text-classifier",
             signature=signature,
-            input_example="Example input text",
+            input_example=test_input,
         )
 
 
 if __name__ == "__main__":
     args = parse_args()
     config = ModelConfig.from_yaml(args.config)  # Or load YAML directly
-    train(config, debug_train=args.debug_train)
+    train(config)

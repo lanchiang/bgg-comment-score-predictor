@@ -13,10 +13,12 @@ class ModelConfig:
     val_data_path: str
     output_dir: str
     num_labels: int
-    batch_size: int
     learning_rate: float
     epochs: int
     warmup_steps: int
+    per_device_train_batch_size: int
+    per_device_eval_batch_size: int
+    weight_decay: float
 
     @classmethod
     def from_yaml(cls, yaml_path: str) -> "ModelConfig":
