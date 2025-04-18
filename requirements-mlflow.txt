@@ -1,6 +1,7 @@
 mlflow
 hyperopt
 torch
+torchvision
 scikit-learn
 transformers
 accelerate
