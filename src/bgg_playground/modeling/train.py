@@ -96,6 +96,8 @@ def train(config: ModelConfig, **kwargs):
         classifier = pipeline("text-classification", model=model, tokenizer=tokenizer)
         test_input = "This is the best game I have ever played!"
         prediction = classifier(test_input)
+        log.info(f"Test prediction: {str(prediction)}")
+
         # Log model to MLflow
         signature = infer_signature(
             model_input=test_input,

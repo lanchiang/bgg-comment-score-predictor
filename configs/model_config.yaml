@@ -6,7 +6,7 @@ val_data_path: "/tmp/data/eval.dataset"
 output_dir: "/tmp/models/checkpoints/distilbert-finetuned"
 num_labels: 11  # Binary classification
 learning_rate: 0.00002
-epochs: 3
+epochs: 1
 warmup_steps: 100
 per_device_train_batch_size: 16
 per_device_eval_batch_size: 16
