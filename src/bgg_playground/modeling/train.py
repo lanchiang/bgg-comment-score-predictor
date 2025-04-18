@@ -75,7 +75,7 @@ def train(config: ModelConfig, **kwargs):
             num_train_epochs=config.epochs,
             weight_decay=config.weight_decay,
             warmup_steps=config.warmup_steps,
-            remove_unused_columns=False
+            remove_unused_columns=True
         )
 
         trainer = Trainer(
